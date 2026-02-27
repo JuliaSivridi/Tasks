@@ -1,0 +1,388 @@
+import { useState, useEffect, useCallback } from 'react'
+import { Plus, FolderOpen, Trash2, RotateCcw, Flag, Tag } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import {
+  DndContext, closestCenter, PointerSensor, KeyboardSensor,
+  useSensor, useSensors, type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext, sortableKeyboardCoordinates, useSortable,
+  verticalListSortingStrategy, arrayMove,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { GripVertical } from 'lucide-react'
+import { TaskItem } from './TaskItem'
+import { TaskCreateModal } from './TaskCreateModal'
+import { useUpcomingGroups, useFilteredRootTasks, useCompletedTasks, usePriorityRootTasks } from '@/hooks/useTasks'
+import { useUIStore } from '@/store/uiStore'
+import { useFoldersStore } from '@/store/foldersStore'
+import { useLabelsStore } from '@/store/labelsStore'
+import { useTasksStore } from '@/store/tasksStore'
+import { formatCompletedAt } from '@/utils/dateUtils'
+import { scheduleFlush } from '@/services/syncService'
+import { cn } from '@/lib/utils'
+import type { Task } from '@/types/task'
+
+// ── Sortable task wrapper for DnD ─────────────────────────────────────────────
+
+function SortableTaskRow({ task, showFolder }: { task: Task; showFolder: boolean }) {
+  const {
+    attributes, listeners, setNodeRef, transform, transition, isDragging,
+  } = useSortable({ id: task.id })
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.4 : 1,
+      }}
+      className="flex items-stretch"
+    >
+      {/* Drag handle */}
+      <button
+        {...attributes}
+        {...listeners}
+        className="flex items-center px-1 text-muted-foreground/30 hover:text-muted-foreground cursor-grab active:cursor-grabbing touch-none"
+        tabIndex={-1}
+      >
+        <GripVertical size={14} />
+      </button>
+      <div className="flex-1">
+        <TaskItem task={task} depth={0} showFolder={showFolder} />
+      </div>
+    </div>
+  )
+}
+
+// ── Upcoming filters ──────────────────────────────────────────────────────────
+
+const PRIORITY_OPTS = [
+  { id: 'urgent',    color: '#f87171', title: 'Urgent' },
+  { id: 'important', color: '#fb923c', title: 'Important' },
+  { id: 'normal',    color: '#9ca3af', title: 'Normal' },
+] as const
+
+function UpcomingFilters({
+  priorityFilter, setPriorityFilter,
+  labelFilter, setLabelFilter,
+}: {
+  priorityFilter: string | null
+  setPriorityFilter: (v: string | null) => void
+  labelFilter: string | null
+  setLabelFilter: (v: string | null) => void
+}) {
+  const { labels } = useLabelsStore()
+
+  return (
+    <div className="flex items-center gap-2 px-3 py-1.5 border-b flex-wrap">
+      {/* Priority pills */}
+      <div className="flex items-center gap-1">
+        {PRIORITY_OPTS.map(p => (
+          <button
+            key={p.id}
+            onClick={() => setPriorityFilter(priorityFilter === p.id ? null : p.id)}
+            className={cn(
+              'p-1.5 rounded transition-colors hover:bg-accent',
+              priorityFilter === p.id && 'bg-accent',
+            )}
+            title={p.title}
+          >
+            <Flag size={14} style={{ color: p.color }} />
+          </button>
+        ))}
+      </div>
+
+      {/* Label pills */}
+      {labels.length > 0 && (
+        <div className="flex items-center gap-1 flex-wrap">
+          {labels.map(l => (
+            <button
+              key={l.id}
+              onClick={() => setLabelFilter(labelFilter === l.id ? null : l.id)}
+              className={cn(
+                'flex items-center gap-1 px-2 py-1 rounded-full border text-xs transition-colors hover:bg-accent',
+                labelFilter === l.id ? 'bg-accent' : 'border-border',
+              )}
+              style={labelFilter === l.id ? { borderColor: l.color } : {}}
+            >
+              <Tag size={10} style={{ color: l.color }} />
+              <span style={{ color: l.color }}>{l.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Upcoming view ─────────────────────────────────────────────────────────────
+
+function UpcomingView() {
+  const groups = useUpcomingGroups()
+  const { setCreateTaskOpen } = useUIStore()
+  const [priorityFilter, setPriorityFilter] = useState<string | null>(null)
+  const [labelFilter, setLabelFilter] = useState<string | null>(null)
+
+  const filtered = groups
+    .map(g => ({
+      ...g,
+      tasks: g.tasks.filter(t => {
+        if (priorityFilter && t.priority !== priorityFilter) return false
+        if (labelFilter && !t.labels.split(',').filter(Boolean).includes(labelFilter)) return false
+        return true
+      }),
+    }))
+    .filter(g => g.tasks.length > 0)
+
+  return (
+    <div className="flex flex-col h-full">
+      <UpcomingFilters
+        priorityFilter={priorityFilter}
+        setPriorityFilter={setPriorityFilter}
+        labelFilter={labelFilter}
+        setLabelFilter={setLabelFilter}
+      />
+      {filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center flex-1 text-muted-foreground gap-3">
+          <FolderOpen size={40} className="opacity-20" />
+          <p>No upcoming tasks</p>
+          <Button variant="ghost" size="sm" onClick={() => setCreateTaskOpen(true)}>
+            <Plus size={16} className="mr-1" /> Add task
+          </Button>
+        </div>
+      ) : (
+        <div className="flex-1 overflow-y-auto p-2 space-y-4">
+          {filtered.map(group => (
+            <div key={group.key}>
+              <div className={cn(
+                'px-2 py-1 text-sm font-semibold mb-1',
+                group.isOverdue ? 'text-red-400'
+                  : group.isToday ? 'text-emerald-500'
+                  : 'text-muted-foreground',
+              )}>
+                {group.label}
+              </div>
+              {group.tasks.map(task => (
+                <TaskItem key={task.id} task={task} depth={0} showFolder={true} hideChildren />
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Folder view with drag-and-drop ────────────────────────────────────────────
+
+function FolderView() {
+  const tasks = useFilteredRootTasks()
+  const { updateTask } = useTasksStore()
+  const { setCreateTaskOpen } = useUIStore()
+  const [localTasks, setLocalTasks] = useState<Task[]>(tasks)
+
+  // Sync local state when external tasks change (but not during drag)
+  useEffect(() => { setLocalTasks(tasks) }, [tasks])
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+
+  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
+    const { active, over, delta } = event
+    if (!over || active.id === over.id) return
+
+    const draggedId = active.id as string
+    const overId = over.id as string
+    const oldIndex = localTasks.findIndex(t => t.id === draggedId)
+    const newIndex = localTasks.findIndex(t => t.id === overId)
+
+    // Drag right (>50px) → reparent dragged task under the "over" task
+    if (delta.x > 50) {
+      const targetTask = localTasks[newIndex]
+      if (targetTask && targetTask.id !== draggedId) {
+        await updateTask(draggedId, { parent_id: targetTask.id })
+        scheduleFlush()
+      }
+      return
+    }
+
+    // Normal vertical reorder
+    if (oldIndex === newIndex) return
+    const reordered = arrayMove(localTasks, oldIndex, newIndex)
+    setLocalTasks(reordered)
+    for (let i = 0; i < reordered.length; i++) {
+      await updateTask(reordered[i].id, { sort_order: i * 10 })
+    }
+    scheduleFlush()
+  }, [localTasks, updateTask])
+
+  if (localTasks.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
+        <FolderOpen size={40} className="opacity-20" />
+        <p>No tasks</p>
+        <Button variant="ghost" size="sm" onClick={() => setCreateTaskOpen(true)}>
+          <Plus size={16} className="mr-1" /> Add task
+        </Button>
+      </div>
+    )
+  }
+
+  return (
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={(e) => void handleDragEnd(e)}>
+      <SortableContext items={localTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+        <div className="p-2">
+          {localTasks.map(task => (
+            <SortableTaskRow key={task.id} task={task} showFolder={false} />
+          ))}
+        </div>
+      </SortableContext>
+    </DndContext>
+  )
+}
+
+// ── Label view — flat list, no hierarchy ──────────────────────────────────────
+
+function LabelView() {
+  const tasks = useFilteredRootTasks()
+  const { setCreateTaskOpen } = useUIStore()
+
+  if (tasks.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
+        <FolderOpen size={40} className="opacity-20" />
+        <p>No tasks</p>
+        <Button variant="ghost" size="sm" onClick={() => setCreateTaskOpen(true)}>
+          <Plus size={16} className="mr-1" /> Add task
+        </Button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-2">
+      {tasks.map(task => (
+        // hideChildren=true → flat list, no subtask expansion
+        <TaskItem key={task.id} task={task} depth={0} showFolder={true} hideChildren />
+      ))}
+    </div>
+  )
+}
+
+// ── Priority view ─────────────────────────────────────────────────────────────
+
+function PriorityView() {
+  const tasks = usePriorityRootTasks()
+  const { setCreateTaskOpen } = useUIStore()
+
+  if (tasks.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
+        <FolderOpen size={40} className="opacity-20" />
+        <p>No tasks</p>
+        <Button variant="ghost" size="sm" onClick={() => setCreateTaskOpen(true)}>
+          <Plus size={16} className="mr-1" /> Add task
+        </Button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-2">
+      {tasks.map(task => (
+        <TaskItem key={task.id} task={task} depth={0} showFolder={true} hideChildren />
+      ))}
+    </div>
+  )
+}
+
+// ── Completed view ────────────────────────────────────────────────────────────
+
+function CompletedView() {
+  const tasks = useCompletedTasks()
+  const { folders } = useFoldersStore()
+  const { labels } = useLabelsStore()
+  const { updateTask, deleteTask } = useTasksStore()
+
+  if (tasks.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
+        <FolderOpen size={40} className="opacity-20" />
+        <p>No completed tasks</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-2">
+      {tasks.map(task => {
+        const folder = folders.find(f => f.id === task.folder_id)
+        const labelIds = task.labels.split(',').filter(Boolean)
+        return (
+          <div
+            key={task.id}
+            className="flex items-start gap-2 px-2 py-2 border-b border-border/40 hover:bg-accent/30 transition-colors group"
+          >
+            <button
+              onClick={() => void updateTask(task.id, { status: 'pending', completed_at: '' })}
+              className="mt-0.5 flex-shrink-0 text-muted-foreground hover:text-primary transition-colors"
+              title="Mark as pending"
+            >
+              <RotateCcw size={16} />
+            </button>
+            <div className="flex-1 min-w-0">
+              <p className="text-base line-through opacity-70">{task.title}</p>
+              <div className="flex items-center gap-3 mt-0.5 text-sm text-muted-foreground flex-wrap">
+                {task.completed_at && <span>{formatCompletedAt(task.completed_at)}</span>}
+                {labelIds.map(id => {
+                  const label = labels.find(l => l.id === id)
+                  return label ? (
+                    <span key={id} className="flex items-center gap-1" style={{ color: label.color }}>
+                      <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: label.color }} />
+                      {label.name}
+                    </span>
+                  ) : null
+                })}
+                {folder && <span>{folder.name}</span>}
+              </div>
+            </div>
+            <button
+              onClick={() => void deleteTask(task.id)}
+              className="opacity-0 group-hover:opacity-100 flex-shrink-0 text-muted-foreground hover:text-destructive transition-colors p-1"
+              title="Delete"
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ── Main TaskList ─────────────────────────────────────────────────────────────
+
+export function TaskList() {
+  const { selectedView, createTaskOpen, setCreateTaskOpen } = useUIStore()
+
+  const renderContent = () => {
+    if (selectedView === 'upcoming') return <UpcomingView />
+    if (selectedView === 'completed') return <CompletedView />
+    if (selectedView === 'label') return <LabelView />
+    if (selectedView === 'priority') return <PriorityView />
+    return <FolderView />
+  }
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden">
+      <div className="flex-1 overflow-y-auto">
+        {renderContent()}
+      </div>
+      <TaskCreateModal open={createTaskOpen} onClose={() => setCreateTaskOpen(false)} />
+    </div>
+  )
+}

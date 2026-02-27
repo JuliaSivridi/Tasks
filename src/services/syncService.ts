@@ -1,0 +1,150 @@
+import { fetchAllTasks, appendTask, updateTask as apiUpdateTask, ensureHeader } from '@/api/tasksApi'
+import { fetchAllFolders, appendFolder, updateFolder as apiUpdateFolder, ensureFolderHeader } from '@/api/foldersApi'
+import { fetchAllLabels, appendLabel, updateLabel as apiUpdateLabel, ensureLabelHeader } from '@/api/labelsApi'
+import { getPending, markProcessing, markDone, markFailed, getQueueLength } from '@/services/offlineQueue'
+import { invalidateRowCache } from '@/api/sheetsClient'
+import { useTasksStore } from '@/store/tasksStore'
+import { useFoldersStore } from '@/store/foldersStore'
+import { useLabelsStore } from '@/store/labelsStore'
+import { useSyncStore } from '@/store/syncStore'
+import { now } from '@/utils/dateUtils'
+import type { Task } from '@/types/task'
+import type { Folder } from '@/types/folder'
+import type { Label } from '@/types/label'
+
+async function processQueueItem(item: NonNullable<Awaited<ReturnType<typeof getPending>>[number]>): Promise<void> {
+  const { entityType, operationType, payload } = item
+
+  if (entityType === 'task') {
+    const task = payload as unknown as Task
+    if (operationType === 'create') await appendTask(task)
+    else if (operationType === 'update') await apiUpdateTask(task)
+    else if (operationType === 'delete') await apiUpdateTask({ ...task, status: 'deleted' })
+  } else if (entityType === 'folder') {
+    const folder = payload as unknown as Folder
+    if (operationType === 'create') await appendFolder(folder)
+    else if (operationType === 'update') await apiUpdateFolder(folder)
+  } else if (entityType === 'label') {
+    const label = payload as unknown as Label
+    if (operationType === 'create') await appendLabel(label)
+    else if (operationType === 'update') await apiUpdateLabel(label)
+  }
+}
+
+export async function flush(): Promise<void> {
+  const items = await getPending()
+  if (items.length === 0) return
+
+  // Deduplicate: for each (entityType, entityId, operationType) keep only the
+  // latest item. Older duplicates are discarded without sending to Sheets.
+  const latestMap = new Map<string, typeof items[0]>()
+  for (const item of items) {
+    const key = `${item.entityType}:${item.entityId}:${item.operationType}`
+    const existing = latestMap.get(key)
+    if (!existing || item.createdAt > existing.createdAt) {
+      latestMap.set(key, item)
+    }
+  }
+  const latestIds = new Set(Array.from(latestMap.values()).map(i => i.localId))
+
+  // Discard superseded items
+  for (const item of items) {
+    if (item.localId && !latestIds.has(item.localId)) {
+      await markDone(item.localId)
+    }
+  }
+
+  // Process only the latest item for each entity
+  for (const item of latestMap.values()) {
+    if (!item.localId) continue
+    try {
+      await markProcessing(item.localId)
+      await processQueueItem(item)
+      await markDone(item.localId)
+    } catch (err) {
+      console.error('Sync flush error', err)
+      await markFailed(item.localId, item.retryCount + 1)
+    }
+  }
+
+  invalidateRowCache()
+  const pending = await getQueueLength()
+  useSyncStore.getState().setPendingCount(pending)
+}
+
+export async function pull(): Promise<void> {
+  const [tasks, folders, labels] = await Promise.all([
+    fetchAllTasks(),
+    fetchAllFolders(),
+    fetchAllLabels(),
+  ])
+
+  await Promise.all([
+    useTasksStore.getState().upsertMany(tasks),
+    useFoldersStore.getState().upsertMany(folders),
+    useLabelsStore.getState().upsertMany(labels),
+  ])
+
+  useSyncStore.getState().setLastSyncAt(now())
+}
+
+export async function initialLoad(): Promise<void> {
+  const sync = useSyncStore.getState()
+  sync.setSyncing(true)
+  sync.setSyncError(null)
+  try {
+    // Ensure sheet headers exist
+    await Promise.all([ensureHeader(), ensureFolderHeader(), ensureLabelHeader()])
+    // Flush any offline changes first, then pull latest
+    await flush()
+    await pull()
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    sync.setSyncError(msg)
+    // Load from local DB as fallback
+    await Promise.all([
+      useTasksStore.getState().loadFromDb(),
+      useFoldersStore.getState().loadFromDb(),
+      useLabelsStore.getState().loadFromDb(),
+    ])
+  } finally {
+    // Always ensure Inbox folder exists
+    await useFoldersStore.getState().ensureInbox()
+    sync.setSyncing(false)
+    const pending = await getQueueLength()
+    sync.setPendingCount(pending)
+  }
+}
+
+// Debounced flush for DnD — batches rapid drags into a single Sheets write.
+// Unlike fullSync(), this is not blocked by isSyncing.
+let _flushTimer: ReturnType<typeof setTimeout> | null = null
+let _flushing = false
+
+export function scheduleFlush(): void {
+  if (_flushTimer) clearTimeout(_flushTimer)
+  _flushTimer = setTimeout(() => {
+    _flushTimer = null
+    if (_flushing) return
+    _flushing = true
+    flush().finally(() => { _flushing = false })
+  }, 800)
+}
+
+export async function fullSync(): Promise<void> {
+  const sync = useSyncStore.getState()
+  if (sync.isSyncing) return
+  sync.setSyncing(true)
+  sync.setSyncError(null)
+  try {
+    await flush()
+    await pull()
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    sync.setSyncError(msg)
+  } finally {
+    sync.setSyncing(false)
+    const pending = await getQueueLength()
+    sync.setPendingCount(pending)
+  }
+}
