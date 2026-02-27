@@ -1,10 +1,13 @@
 import { useState, useRef, useEffect } from 'react'
-import { ChevronRight, ChevronDown, Clock, Tag, Flag, Pencil, Trash2, RefreshCw, Plus } from 'lucide-react'
+import { ChevronRight, ChevronDown, Clock, Tag, Flag, Pencil, Trash2, RefreshCw, Plus, MoreHorizontal } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { TaskCreateModal } from './TaskCreateModal'
 import { TaskChildren } from './TaskChildren'
 import { TimePickerDialog } from './TimePickerDialog'
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { useTasksStore } from '@/store/tasksStore'
 import { useLabelsStore } from '@/store/labelsStore'
 import { useFoldersStore } from '@/store/foldersStore'
@@ -193,9 +196,8 @@ export function TaskItem({ task, depth, showFolder = false, hideChildren = false
             {task.title}
           </span>
 
-          {/* Action icons */}
-          <div className="flex items-center flex-shrink-0">
-            {/* Time */}
+          {/* Action icons — desktop (md+): all visible */}
+          <div className="hidden md:flex items-center flex-shrink-0">
             <button
               onClick={() => setTimePickerOpen(true)}
               className={cn(
@@ -207,7 +209,6 @@ export function TaskItem({ task, depth, showFolder = false, hideChildren = false
               <Clock size={15} />
             </button>
 
-            {/* Priority */}
             <div className="relative">
               <button
                 onClick={() => { setPriorityPickerOpen(!priorityPickerOpen); setLabelPickerOpen(false) }}
@@ -221,7 +222,6 @@ export function TaskItem({ task, depth, showFolder = false, hideChildren = false
               )}
             </div>
 
-            {/* Label */}
             <div className="relative">
               <button
                 onClick={() => { setLabelPickerOpen(!labelPickerOpen); setPriorityPickerOpen(false) }}
@@ -238,7 +238,6 @@ export function TaskItem({ task, depth, showFolder = false, hideChildren = false
               )}
             </div>
 
-            {/* Add subtask */}
             <button
               onClick={() => setAddChildOpen(true)}
               className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
@@ -247,7 +246,6 @@ export function TaskItem({ task, depth, showFolder = false, hideChildren = false
               <Plus size={15} />
             </button>
 
-            {/* Edit */}
             <button
               onClick={() => setEditOpen(true)}
               className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
@@ -256,7 +254,6 @@ export function TaskItem({ task, depth, showFolder = false, hideChildren = false
               <Pencil size={15} />
             </button>
 
-            {/* Delete */}
             <button
               onClick={() => setConfirmDelete(true)}
               className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-destructive transition-colors"
@@ -264,6 +261,60 @@ export function TaskItem({ task, depth, showFolder = false, hideChildren = false
             >
               <Trash2 size={15} />
             </button>
+          </div>
+
+          {/* Action icons — mobile: Clock + Flag + "..." dropdown */}
+          <div className="flex md:hidden items-center flex-shrink-0">
+            <button
+              onClick={() => setTimePickerOpen(true)}
+              className={cn(
+                'p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors',
+                task.deadline_date && timeColorClass,
+              )}
+            >
+              <Clock size={15} />
+            </button>
+
+            <div className="relative">
+              <button
+                onClick={() => { setPriorityPickerOpen(!priorityPickerOpen) }}
+                className="p-1.5 rounded hover:bg-accent transition-colors"
+              >
+                <Flag size={15} style={{ color: priorityColor(task.priority) }} />
+              </button>
+              {priorityPickerOpen && (
+                <PriorityPicker taskId={task.id} current={task.priority} onClose={() => setPriorityPickerOpen(false)} />
+              )}
+            </div>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors">
+                  <MoreHorizontal size={15} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setLabelPickerOpen(true)}>
+                  <Tag size={14} className="mr-2" />
+                  Labels
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setAddChildOpen(true)}>
+                  <Plus size={14} className="mr-2" />
+                  Add subtask
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setEditOpen(true)}>
+                  <Pencil size={14} className="mr-2" />
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setConfirmDelete(true)}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 size={14} className="mr-2" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
