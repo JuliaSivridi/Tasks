@@ -1,73 +1,95 @@
-# React + TypeScript + Vite
+# Task Manager
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A personal task manager built as a Progressive Web App. Runs in any browser and installs on Android/iOS home screens like a native app. No backend — Google Sheets is used as the database.
 
-Currently, two official plugins are available:
+**Live:** [stler-tasks.vercel.app](https://stler-tasks.vercel.app)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+---
 
-## React Compiler
+## Features
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Multiple views** — Upcoming (grouped by day), Completed, Priority (Urgent / Important / Normal), Folders, Labels
+- **Task hierarchy** — subtasks with expand/collapse and drag-and-drop reordering
+- **Deadlines** — date + optional time, color-coded: overdue / today / tomorrow / this week
+- **Recurring tasks** — daily / weekly / monthly; completing advances the deadline automatically
+- **Labels & Folders** — organize tasks with colored labels and folders
+- **Offline-first** — full read/write without internet, syncs automatically on reconnect
+- **PWA** — installable on Android and iOS, works as a standalone app with its own icon
 
-## Expanding the ESLint configuration
+## Tech Stack
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+| Layer | Technology |
+|---|---|
+| Framework | React 18 + TypeScript 5 |
+| Build | Vite 7 |
+| Styling | Tailwind CSS v3 + shadcn/ui |
+| State | Zustand 5 |
+| Database | Google Sheets API v4 |
+| Auth | Google Identity Services (OAuth 2.0) |
+| Offline storage | Dexie.js (IndexedDB) |
+| PWA | vite-plugin-pwa (Workbox) |
+| Hosting | Vercel |
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Setup
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### Prerequisites
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+- Google account
+- Google Cloud project with **Google Sheets API v4** enabled
+- OAuth 2.0 Client ID (type: Web application)
+- An empty Google Spreadsheet (the app creates the schema on first run)
+
+### Google Cloud Console
+
+1. Go to [console.cloud.google.com](https://console.cloud.google.com)
+2. Enable **Google Sheets API v4**
+3. Create an **OAuth 2.0 Client ID** → type: Web application
+4. Add to **Authorized JavaScript origins**:
+   ```
+   http://localhost:5173
+   https://your-app.vercel.app
+   ```
+5. Add your Google account as a **test user** in the OAuth consent screen
+
+### Local Development
+
+```bash
+git clone https://github.com/JuliaSivridi/Tasks.git
+cd Tasks
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Create `.env` in the project root:
 ```
+VITE_GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
+VITE_SPREADSHEET_ID=your-spreadsheet-id
+```
+
+```bash
+npm run dev
+# http://localhost:5173
+```
+
+### Deploy to Vercel
+
+1. Import the repository at [vercel.com](https://vercel.com)
+2. Add environment variables in project Settings → Environment Variables:
+   - `VITE_GOOGLE_CLIENT_ID`
+   - `VITE_SPREADSHEET_ID`
+3. Every push to `main` triggers automatic deployment
+
+## Data Model
+
+Data is stored in a Google Spreadsheet with three sheets:
+
+| Sheet | Columns |
+|---|---|
+| tasks | id, title, status, priority, folder_id, parent_id, labels, deadline_date, deadline_time, is_recurring, recur_type, recur_value, sort_order, created_at, updated_at, completed_at |
+| folders | id, name, color, sort_order, created_at, updated_at |
+| labels | id, name, color, created_at, updated_at |
+
+## Install as Mobile App
+
+**Android:** Chrome prompts automatically, or use the browser menu → *Install app*
+
+**iOS:** Safari → Share button → *Add to Home Screen*
