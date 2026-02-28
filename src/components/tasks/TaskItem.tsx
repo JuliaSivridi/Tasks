@@ -7,6 +7,7 @@ import { TaskChildren } from './TaskChildren'
 import { TimePickerDialog } from './TimePickerDialog'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useTasksStore } from '@/store/tasksStore'
 import { useLabelsStore } from '@/store/labelsStore'
@@ -263,7 +264,7 @@ export function TaskItem({ task, depth, showFolder = false, hideChildren = false
             </button>
           </div>
 
-          {/* Action icons — mobile: Clock + Flag + "..." dropdown */}
+          {/* Action icons — mobile: Clock + "..." with submenus */}
           <div className="flex md:hidden items-center flex-shrink-0">
             <button
               onClick={() => setTimePickerOpen(true)}
@@ -275,18 +276,6 @@ export function TaskItem({ task, depth, showFolder = false, hideChildren = false
               <Clock size={15} />
             </button>
 
-            <div className="relative">
-              <button
-                onClick={() => { setPriorityPickerOpen(!priorityPickerOpen) }}
-                className="p-1.5 rounded hover:bg-accent transition-colors"
-              >
-                <Flag size={15} style={{ color: priorityColor(task.priority) }} />
-              </button>
-              {priorityPickerOpen && (
-                <PriorityPicker taskId={task.id} current={task.priority} onClose={() => setPriorityPickerOpen(false)} />
-              )}
-            </div>
-
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors">
@@ -294,10 +283,59 @@ export function TaskItem({ task, depth, showFolder = false, hideChildren = false
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setLabelPickerOpen(true)}>
-                  <Tag size={14} className="mr-2" />
-                  Labels
-                </DropdownMenuItem>
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>
+                    <Flag size={14} className="mr-2" style={{ color: priorityColor(task.priority) }} />
+                    Priority
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    {([
+                      { value: 'urgent', label: 'Urgent', color: '#f87171' },
+                      { value: 'important', label: 'Important', color: '#fb923c' },
+                      { value: 'normal', label: 'Normal', color: '#9ca3af' },
+                    ] as const).map(p => (
+                      <DropdownMenuItem
+                        key={p.value}
+                        onClick={() => void updateTask(task.id, { priority: p.value })}
+                      >
+                        <Flag size={14} className="mr-2" style={{ color: p.color }} />
+                        {p.label}
+                        {task.priority === p.value && <span className="ml-auto pl-2 text-primary">✓</span>}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>
+                    <Tag size={14} className={cn('mr-2', labelIds.length > 0 ? 'text-primary' : '')} />
+                    Labels
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    {labels.length === 0
+                      ? <DropdownMenuItem disabled>Create labels in the sidebar</DropdownMenuItem>
+                      : labels.map(l => {
+                          const active = labelIds.includes(l.id)
+                          return (
+                            <DropdownMenuItem
+                              key={l.id}
+                              onClick={() => {
+                                const next = active
+                                  ? labelIds.filter(id => id !== l.id)
+                                  : [...labelIds, l.id]
+                                void updateTask(task.id, { labels: next.join(',') })
+                              }}
+                            >
+                              <Tag size={14} className="mr-2" style={{ color: l.color }} />
+                              <span style={{ color: l.color }}>{l.name}</span>
+                              {active && <span className="ml-auto pl-2 text-primary">✓</span>}
+                            </DropdownMenuItem>
+                          )
+                        })
+                    }
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+
                 <DropdownMenuItem onClick={() => setAddChildOpen(true)}>
                   <Plus size={14} className="mr-2" />
                   Add subtask
