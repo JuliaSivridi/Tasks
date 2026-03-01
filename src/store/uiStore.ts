@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type SelectedView = 'upcoming' | 'folder' | 'label' | 'priority' | 'completed'
+export type SelectedView = 'upcoming' | 'all' | 'folder' | 'label' | 'priority' | 'completed'
 
 interface UIState {
   selectedView: SelectedView

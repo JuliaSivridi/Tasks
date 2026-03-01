@@ -62,7 +62,7 @@ export function useUpcomingGroups(): TaskGroup[] {
   }, [tasks])
 }
 
-const PRIORITY_ORDER: Record<string, number> = { urgent: 0, important: 1, normal: 2 }
+export const PRIORITY_ORDER: Record<string, number> = { urgent: 0, important: 1, normal: 2 }
 
 // ── Folder / label view: pending root tasks ───────────────────────────────────
 export function useFilteredRootTasks() {
@@ -120,6 +120,28 @@ export function usePriorityRootTasks() {
         return a.sort_order - b.sort_order
       })
   }, [tasks, selectedPriorityId])
+}
+
+// ── All tasks view: all pending tasks, flat ───────────────────────────────────
+export function useAllTasks() {
+  const tasks = useTasksStore((s) => s.tasks)
+
+  return useMemo(() => {
+    return tasks
+      .filter(t => t.status === 'pending')
+      .sort((a, b) => {
+        // 1. Priority (urgent → important → normal)
+        const pa = PRIORITY_ORDER[a.priority] ?? 2
+        const pb = PRIORITY_ORDER[b.priority] ?? 2
+        if (pa !== pb) return pa - pb
+        // 2. Deadline (earliest first, no deadline last)
+        if (a.deadline_date && b.deadline_date) return a.deadline_date.localeCompare(b.deadline_date)
+        if (a.deadline_date) return -1
+        if (b.deadline_date) return 1
+        // 3. Created at (oldest first)
+        return a.created_at.localeCompare(b.created_at)
+      })
+  }, [tasks])
 }
 
 // ── Completed view: all completed tasks sorted by completion time desc ─────────

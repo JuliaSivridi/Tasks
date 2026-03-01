@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CalendarClock, CheckCircle2, Inbox, Plus, MoreHorizontal, Pencil, Trash2, Tag, Folder, RefreshCw, Flag } from 'lucide-react'
+import { CalendarClock, CheckCircle2, LayoutList, Inbox, Plus, MoreHorizontal, Pencil, Trash2, Tag, Folder, RefreshCw, Flag } from 'lucide-react'
 import { useUIStore } from '@/store/uiStore'
 import { useLabelsStore } from '@/store/labelsStore'
 import { useFoldersStore } from '@/store/foldersStore'
@@ -146,6 +146,7 @@ export function Sidebar() {
         <div className="space-y-0.5">
           {([
             { view: 'upcoming' as const, label: 'Upcoming', icon: <CalendarClock size={16} /> },
+            { view: 'all' as const, label: 'All tasks', icon: <LayoutList size={16} /> },
             { view: 'completed' as const, label: 'Completed', icon: <CheckCircle2 size={16} /> },
           ]).map(({ view, label, icon }) => (
             <button

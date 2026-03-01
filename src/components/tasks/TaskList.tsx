@@ -13,7 +13,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { GripVertical } from 'lucide-react'
 import { TaskItem } from './TaskItem'
 import { TaskCreateModal } from './TaskCreateModal'
-import { useUpcomingGroups, useFilteredRootTasks, useCompletedTasks, usePriorityRootTasks } from '@/hooks/useTasks'
+import { useUpcomingGroups, useFilteredRootTasks, useCompletedTasks, usePriorityRootTasks, useAllTasks } from '@/hooks/useTasks'
 import { useUIStore } from '@/store/uiStore'
 import { useFoldersStore } from '@/store/foldersStore'
 import { useLabelsStore } from '@/store/labelsStore'
@@ -274,6 +274,47 @@ function LabelView() {
   )
 }
 
+// ── All tasks view ────────────────────────────────────────────────────────────
+
+function AllTasksView() {
+  const allTasks = useAllTasks()
+  const { setCreateTaskOpen } = useUIStore()
+  const [priorityFilter, setPriorityFilter] = useState<string | null>(null)
+  const [labelFilter, setLabelFilter] = useState<string | null>(null)
+
+  const filtered = allTasks.filter(t => {
+    if (priorityFilter && t.priority !== priorityFilter) return false
+    if (labelFilter && !t.labels.split(',').filter(Boolean).includes(labelFilter)) return false
+    return true
+  })
+
+  return (
+    <div className="flex flex-col h-full">
+      <UpcomingFilters
+        priorityFilter={priorityFilter}
+        setPriorityFilter={setPriorityFilter}
+        labelFilter={labelFilter}
+        setLabelFilter={setLabelFilter}
+      />
+      {filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center flex-1 text-muted-foreground gap-3">
+          <FolderOpen size={40} className="opacity-20" />
+          <p>No tasks</p>
+          <Button variant="ghost" size="sm" onClick={() => setCreateTaskOpen(true)}>
+            <Plus size={16} className="mr-1" /> Add task
+          </Button>
+        </div>
+      ) : (
+        <div className="flex-1 overflow-y-auto p-2">
+          {filtered.map(task => (
+            <TaskItem key={task.id} task={task} depth={0} showFolder={true} hideChildren />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Priority view ─────────────────────────────────────────────────────────────
 
 function PriorityView() {
@@ -372,6 +413,7 @@ export function TaskList() {
 
   const renderContent = () => {
     if (selectedView === 'upcoming') return <UpcomingView />
+    if (selectedView === 'all') return <AllTasksView />
     if (selectedView === 'completed') return <CompletedView />
     if (selectedView === 'label') return <LabelView />
     if (selectedView === 'priority') return <PriorityView />
