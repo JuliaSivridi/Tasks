@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { CalendarClock, CheckCircle2, LayoutList, Inbox, Plus, MoreHorizontal, Pencil, Trash2, Folder, RefreshCw } from 'lucide-react'
 import { useUIStore } from '@/store/uiStore'
 import { useFoldersStore } from '@/store/foldersStore'
@@ -6,82 +6,74 @@ import { useTasksStore } from '@/store/tasksStore'
 import { useSyncStore } from '@/store/syncStore'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog'
+import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
-import { INBOX_FOLDER_ID } from '@/utils/constants'
+import { INBOX_FOLDER_ID, LABEL_COLOR_PRESETS } from '@/utils/constants'
 import { format } from 'date-fns'
 import { fullSync } from '@/services/syncService'
 
-// ─── Inline create form ───────────────────────────────────────────────────────
+// ─── Folder form modal ────────────────────────────────────────────────────────
 
-function InlineCreate({
-  placeholder,
-  onSave,
-  onCancel,
+function FolderFormModal({
+  open, title, initialName = '', initialColor = LABEL_COLOR_PRESETS[1],
+  onSave, onCancel,
 }: {
-  placeholder: string
-  onSave: (name: string) => void
-  onCancel: () => void
-}) {
-  const [name, setName] = useState('')
-  return (
-    <div className="px-2 pb-1 space-y-1.5">
-      <div className="flex gap-1">
-        <Input
-          autoFocus
-          className="h-7 text-xs"
-          placeholder={placeholder}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && name.trim()) onSave(name.trim())
-            if (e.key === 'Escape') onCancel()
-          }}
-        />
-        <button
-          onClick={() => name.trim() && onSave(name.trim())}
-          className="text-sm px-2 rounded bg-primary text-primary-foreground hover:bg-primary/90 whitespace-nowrap"
-        >
-          OK
-        </button>
-      </div>
-    </div>
-  )
-}
-
-// ─── Inline rename form ───────────────────────────────────────────────────────
-
-function InlineRename({
-  initialName,
-  onSave,
-  onCancel,
-}: {
-  initialName: string
-  onSave: (name: string) => void
+  open: boolean
+  title: string
+  initialName?: string
+  initialColor?: string
+  onSave: (name: string, color: string) => void
   onCancel: () => void
 }) {
   const [name, setName] = useState(initialName)
+  const [color, setColor] = useState(initialColor)
+
+  useEffect(() => {
+    if (open) { setName(initialName); setColor(initialColor) }
+  }, [open, initialName, initialColor])
+
   return (
-    <div className="flex gap-1 px-2 py-0.5">
-      <Input
-        autoFocus
-        className="h-7 text-xs"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && name.trim()) onSave(name.trim())
-          if (e.key === 'Escape') onCancel()
-        }}
-      />
-      <button
-        onClick={() => name.trim() && onSave(name.trim())}
-        className="text-sm px-2 rounded bg-primary text-primary-foreground hover:bg-primary/90"
-      >
-        OK
-      </button>
-    </div>
+    <Dialog open={open} onOpenChange={(v) => !v && onCancel()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 pt-1">
+          <Input
+            autoFocus
+            placeholder="Folder name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && name.trim()) onSave(name.trim(), color)
+            }}
+          />
+          <div className="flex gap-2 flex-wrap">
+            {LABEL_COLOR_PRESETS.map(c => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setColor(c)}
+                className="w-6 h-6 rounded-full border-2 transition-all"
+                style={{ backgroundColor: c, borderColor: c === color ? 'white' : 'transparent' }}
+              />
+            ))}
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={onCancel}>Cancel</Button>
+            <Button onClick={() => name.trim() && onSave(name.trim(), color)} disabled={!name.trim()}>
+              Save
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -95,7 +87,7 @@ export function Sidebar() {
   const { lastSyncAt, isSyncing } = useSyncStore()
 
   const [creatingFolder, setCreatingFolder] = useState(false)
-  const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null)
+  const [editingFolder, setEditingFolder] = useState<{ id: string; name: string; color: string } | null>(null)
   const [deletingFolderId, setDeletingFolderId] = useState<string | null>(null)
 
   const sortedFolders = [...folders].sort((a, b) => a.sort_order - b.sort_order)
@@ -139,9 +131,7 @@ export function Sidebar() {
         {/* ── Folders ── */}
         <div className="border-t pt-2 space-y-0.5">
           <div className="flex items-center justify-between px-2 mb-1">
-            <span className="text-sm font-semibold text-muted-foreground">
-              Folders
-            </span>
+            <span className="text-sm font-semibold text-muted-foreground">Folders</span>
             <button
               onClick={() => setCreatingFolder(true)}
               className="text-muted-foreground hover:text-foreground transition-colors"
@@ -150,17 +140,6 @@ export function Sidebar() {
               <Plus size={16} />
             </button>
           </div>
-
-          {creatingFolder && (
-            <InlineCreate
-              placeholder="Folder name"
-              onSave={async (name) => {
-                await addFolder({ name, color: '#f97316', sort_order: folders.length })
-                setCreatingFolder(false)
-              }}
-              onCancel={() => setCreatingFolder(false)}
-            />
-          )}
 
           {/* Inbox first, always */}
           {(() => {
@@ -181,49 +160,40 @@ export function Sidebar() {
           })()}
 
           {sortedFolders.filter(f => f.id !== INBOX_FOLDER_ID).map(folder => (
-            <div key={folder.id}>
-              {renamingFolderId === folder.id ? (
-                <InlineRename
-                  initialName={folder.name}
-                  onSave={async (name) => {
-                    await updateFolder(folder.id, { name })
-                    setRenamingFolderId(null)
-                  }}
-                  onCancel={() => setRenamingFolderId(null)}
-                />
-              ) : (
-                <div
-                  onClick={() => goTo('folder', folder.id)}
-                  className={cn(
-                    'group flex items-center gap-1.5 px-2 py-2 rounded-md text-base cursor-pointer transition-colors hover:bg-accent',
-                    selectedView === 'folder' && selectedFolderId === folder.id && 'bg-accent font-medium text-primary',
-                  )}
-                >
-                  <Folder size={16} className="flex-shrink-0 text-primary" />
-                  <span className="flex-1 truncate">{folder.name}</span>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button
-                        onClick={(e) => e.stopPropagation()}
-                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground"
-                      >
-                        <MoreHorizontal size={16} />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-36">
-                      <DropdownMenuItem onClick={() => setRenamingFolderId(folder.id)}>
-                        <Pencil size={14} className="mr-2" /> Rename
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-destructive"
-                        onClick={() => setDeletingFolderId(folder.id)}
-                      >
-                        <Trash2 size={14} className="mr-2" /> Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
+            <div
+              key={folder.id}
+              onClick={() => goTo('folder', folder.id)}
+              className={cn(
+                'group flex items-center gap-1.5 px-2 py-2 rounded-md text-base cursor-pointer transition-colors hover:bg-accent',
+                selectedView === 'folder' && selectedFolderId === folder.id && 'bg-accent font-medium text-primary',
               )}
+            >
+              <Folder size={16} className="flex-shrink-0" style={{ color: folder.color }} />
+              <span className="flex-1 truncate">{folder.name}</span>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    onClick={(e) => e.stopPropagation()}
+                    className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground"
+                  >
+                    <MoreHorizontal size={16} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-36">
+                  <DropdownMenuItem onClick={(e) => {
+                    e.stopPropagation()
+                    setEditingFolder({ id: folder.id, name: folder.name, color: folder.color })
+                  }}>
+                    <Pencil size={14} className="mr-2" /> Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="text-destructive"
+                    onClick={(e) => { e.stopPropagation(); setDeletingFolderId(folder.id) }}
+                  >
+                    <Trash2 size={14} className="mr-2" /> Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           ))}
         </div>
@@ -244,6 +214,30 @@ export function Sidebar() {
           {isSyncing ? 'Syncing...' : lastSyncAt ? `Synced ${format(new Date(lastSyncAt), 'HH:mm')}` : 'Not synced'}
         </span>
       </div>
+
+      {/* Create folder modal */}
+      <FolderFormModal
+        open={creatingFolder}
+        title="New folder"
+        onSave={async (name, color) => {
+          await addFolder({ name, color, sort_order: folders.length })
+          setCreatingFolder(false)
+        }}
+        onCancel={() => setCreatingFolder(false)}
+      />
+
+      {/* Edit folder modal */}
+      <FolderFormModal
+        open={editingFolder !== null}
+        title="Edit folder"
+        initialName={editingFolder?.name}
+        initialColor={editingFolder?.color}
+        onSave={async (name, color) => {
+          if (editingFolder) await updateFolder(editingFolder.id, { name, color })
+          setEditingFolder(null)
+        }}
+        onCancel={() => setEditingFolder(null)}
+      />
 
       <ConfirmDialog
         open={deletingFolderId !== null}

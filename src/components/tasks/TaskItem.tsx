@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { ChevronRight, ChevronDown, Clock, Tag, Flag, Pencil, Trash2, RefreshCw, Plus, MoreHorizontal } from 'lucide-react'
+import { ChevronRight, ChevronDown, Clock, Tag, Flag, Pencil, Trash2, RefreshCw, Plus, MoreHorizontal, ListChecks } from 'lucide-react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { TaskCreateModal } from './TaskCreateModal'
@@ -137,7 +137,10 @@ export function TaskItem({ task, depth, showFolder = false, hideChildren = false
   const { labels } = useLabelsStore()
   const { folders } = useFoldersStore()
 
-  const children = getChildren(task.id).filter(t => t.status === 'pending')
+  const allChildren = getChildren(task.id)
+  const children = allChildren.filter(t => t.status === 'pending')
+  const completedChildCount = allChildren.filter(t => t.status === 'completed').length
+  const totalChildCount = allChildren.length
   const labelIds = task.labels.split(',').filter(Boolean)
   const isCompleted = task.status === 'completed'
   const folder = folders.find(f => f.id === task.folder_id)
@@ -149,7 +152,7 @@ export function TaskItem({ task, depth, showFolder = false, hideChildren = false
     : deadlineStatus === 'week' ? 'text-violet-400'
     : 'text-muted-foreground'
 
-  const hasSecondLine = task.deadline_date || labelIds.length > 0 || (folder && showFolder) || task.is_recurring
+  const hasSecondLine = task.deadline_date || labelIds.length > 0 || (folder && showFolder) || task.is_recurring || totalChildCount > 0
 
   const handleComplete = async () => {
     if (task.is_recurring && task.deadline_date) {
@@ -382,6 +385,12 @@ export function TaskItem({ task, depth, showFolder = false, hideChildren = false
             })}
             {folder && showFolder && folder.id !== INBOX_FOLDER_ID && (
               <span className="text-muted-foreground">{folder.name}</span>
+            )}
+            {totalChildCount > 0 && (
+              <span className="flex items-center gap-1 text-muted-foreground/70">
+                <ListChecks size={12} />
+                {completedChildCount}/{totalChildCount}
+              </span>
             )}
           </div>
         )}
