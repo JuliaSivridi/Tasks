@@ -1,8 +1,8 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm, Controller, type SubmitHandler } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Flag, Tag } from 'lucide-react'
+import { Flag, Tag, Plus } from 'lucide-react'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
@@ -16,7 +16,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { useTasksStore } from '@/store/tasksStore'
 import { useUIStore } from '@/store/uiStore'
 import { useLabelsStore } from '@/store/labelsStore'
-import { INBOX_FOLDER_ID } from '@/utils/constants'
+import { INBOX_FOLDER_ID, LABEL_COLOR_PRESETS } from '@/utils/constants'
 import { cn } from '@/lib/utils'
 import type { Task } from '@/types/task'
 
@@ -50,7 +50,11 @@ const PRIORITY_OPTIONS = [
 export function TaskCreateModal({ open, editing, parentId = '', onClose }: Props) {
   const { addTask, updateTask } = useTasksStore()
   const { selectedFolderId, selectedView } = useUIStore()
-  const { labels } = useLabelsStore()
+  const { labels, addLabel } = useLabelsStore()
+
+  const [creatingLabel, setCreatingLabel] = useState(false)
+  const [newLabelName, setNewLabelName] = useState('')
+  const [newLabelColor, setNewLabelColor] = useState(LABEL_COLOR_PRESETS[5])
 
   const { register, control, handleSubmit, watch, reset, setValue, formState: { errors } } =
     useForm<FormValues>({
@@ -64,6 +68,7 @@ export function TaskCreateModal({ open, editing, parentId = '', onClose }: Props
     })
 
   useEffect(() => {
+    if (!open) { setCreatingLabel(false); setNewLabelName('') }
     if (!open) return
     if (editing) {
       reset({
@@ -95,6 +100,15 @@ export function TaskCreateModal({ open, editing, parentId = '', onClose }: Props
     if (editing) return editing.folder_id
     if (selectedView === 'folder' && selectedFolderId) return selectedFolderId
     return INBOX_FOLDER_ID
+  }
+
+  const handleCreateLabel = async () => {
+    if (!newLabelName.trim()) return
+    const created = await addLabel({ name: newLabelName.trim(), color: newLabelColor })
+    setValue('labels', [...currentLabels, created.id].join(','))
+    setCreatingLabel(false)
+    setNewLabelName('')
+    setNewLabelColor(LABEL_COLOR_PRESETS[5])
   }
 
   const toggleLabel = (labelId: string) => {
@@ -155,9 +169,20 @@ export function TaskCreateModal({ open, editing, parentId = '', onClose }: Props
           </div>
 
           {/* Labels */}
-          {labels.length > 0 && (
-            <div className="space-y-1.5">
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
               <Label className="text-muted-foreground text-sm">Labels</Label>
+              {!creatingLabel && (
+                <button
+                  type="button"
+                  onClick={() => setCreatingLabel(true)}
+                  className="flex items-center gap-0.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Plus size={12} /> New
+                </button>
+              )}
+            </div>
+            {labels.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {labels.map(label => {
                   const selected = currentLabels.includes(label.id)
@@ -178,8 +203,50 @@ export function TaskCreateModal({ open, editing, parentId = '', onClose }: Props
                   )
                 })}
               </div>
-            </div>
-          )}
+            )}
+            {creatingLabel && (
+              <div className="space-y-1.5">
+                <div className="flex gap-1 flex-wrap">
+                  {LABEL_COLOR_PRESETS.map(c => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setNewLabelColor(c)}
+                      className="w-4 h-4 rounded-full border-2 transition-all"
+                      style={{ backgroundColor: c, borderColor: c === newLabelColor ? 'white' : 'transparent' }}
+                    />
+                  ))}
+                </div>
+                <div className="flex gap-1">
+                  <Input
+                    autoFocus
+                    className="h-8 text-sm"
+                    placeholder="Label name"
+                    value={newLabelName}
+                    onChange={(e) => setNewLabelName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') { e.preventDefault(); void handleCreateLabel() }
+                      if (e.key === 'Escape') { setCreatingLabel(false); setNewLabelName('') }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void handleCreateLabel()}
+                    className="text-sm px-2.5 rounded bg-primary text-primary-foreground hover:bg-primary/90 whitespace-nowrap"
+                  >
+                    OK
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setCreatingLabel(false); setNewLabelName('') }}
+                    className="text-sm px-2 rounded border hover:bg-accent"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Priority */}
           <div className="space-y-1.5">
