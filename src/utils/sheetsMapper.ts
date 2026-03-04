@@ -27,11 +27,12 @@ export function rowToTask(row: string[]): Task {
     created_at:    cell(row, TASK_COL.CREATED_AT),
     updated_at:    cell(row, TASK_COL.UPDATED_AT),
     completed_at:  cell(row, TASK_COL.COMPLETED_AT),
+    is_expanded:   cell(row, TASK_COL.IS_EXPANDED) !== 'FALSE',
   }
 }
 
 export function taskToRow(task: Task): string[] {
-  const row = new Array(16).fill('')
+  const row = new Array(17).fill('')
   row[TASK_COL.ID]            = task.id
   row[TASK_COL.PARENT_ID]     = task.parent_id
   row[TASK_COL.FOLDER_ID]     = task.folder_id
@@ -48,6 +49,7 @@ export function taskToRow(task: Task): string[] {
   row[TASK_COL.CREATED_AT]    = task.created_at
   row[TASK_COL.UPDATED_AT]    = task.updated_at
   row[TASK_COL.COMPLETED_AT]  = task.completed_at ?? ''
+  row[TASK_COL.IS_EXPANDED]   = task.is_expanded === false ? 'FALSE' : 'TRUE'
   return row
 }
 

@@ -125,10 +125,8 @@ interface Props {
 }
 
 export function TaskItem({ task, depth, showFolder = false, hideChildren = false }: Props) {
-  const [expanded, setExpanded] = useState(() => {
-    const stored = localStorage.getItem(`expand-${task.id}`)
-    return stored !== 'false'
-  })
+  const [expanded, setExpanded] = useState(task.is_expanded !== false)
+  useEffect(() => { setExpanded(task.is_expanded !== false) }, [task.is_expanded])
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [addChildOpen, setAddChildOpen] = useState(false)
@@ -136,7 +134,7 @@ export function TaskItem({ task, depth, showFolder = false, hideChildren = false
   const [priorityPickerOpen, setPriorityPickerOpen] = useState(false)
   const [timePickerOpen, setTimePickerOpen] = useState(false)
 
-  const { completeTask, updateTask, deleteTask, getChildren } = useTasksStore()
+  const { completeTask, updateTask, deleteTask, getChildren, setTaskExpanded } = useTasksStore()
   const { labels } = useLabelsStore()
   const { folders } = useFoldersStore()
 
@@ -183,8 +181,7 @@ export function TaskItem({ task, depth, showFolder = false, hideChildren = false
               onClick={() => {
                 const next = !expanded
                 setExpanded(next)
-                if (!next) localStorage.setItem(`expand-${task.id}`, 'false')
-                else localStorage.removeItem(`expand-${task.id}`)
+                void setTaskExpanded(task.id, next)
               }}
               className="text-muted-foreground hover:text-foreground flex-shrink-0 p-0.5"
             >

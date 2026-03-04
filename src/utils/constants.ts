@@ -21,6 +21,7 @@ export const TASK_COL = {
   CREATED_AT: 13,
   UPDATED_AT: 14,
   COMPLETED_AT: 15,
+  IS_EXPANDED: 16,
 } as const
 
 // Folder columns: id | name | color | sort_order
@@ -39,7 +40,7 @@ export const LABEL_COL = {
 } as const
 
 // Sheet ranges
-export const TASK_RANGE = `${SHEET_TASKS}!A:P`
+export const TASK_RANGE = `${SHEET_TASKS}!A:Q`
 export const FOLDER_RANGE = `${SHEET_FOLDERS}!A:D`
 export const LABEL_RANGE = `${SHEET_LABELS}!A:C`
 

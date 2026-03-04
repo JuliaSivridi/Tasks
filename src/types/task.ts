@@ -19,6 +19,7 @@ export interface Task {
   created_at: string     // ISO 8601
   updated_at: string     // ISO 8601
   completed_at: string   // ISO 8601 or ''
+  is_expanded: boolean   // expand state for task hierarchy
 }
 
-export type TaskInput = Omit<Task, 'id' | 'created_at' | 'updated_at' | 'completed_at'>
+export type TaskInput = Omit<Task, 'id' | 'created_at' | 'updated_at' | 'completed_at' | 'is_expanded'>

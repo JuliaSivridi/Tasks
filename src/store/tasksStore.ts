@@ -10,6 +10,7 @@ interface TasksState {
   loadFromDb: () => Promise<void>
   addTask: (input: TaskInput) => Promise<Task>
   updateTask: (id: string, changes: Partial<Task>) => Promise<void>
+  setTaskExpanded: (id: string, is_expanded: boolean) => Promise<void>
   completeTask: (id: string) => Promise<void>
   deleteTask: (id: string) => Promise<void>
   upsertMany: (tasks: Task[]) => Promise<void>
@@ -44,6 +45,7 @@ export const useTasksStore = create<TasksState>((set, get) => ({
       created_at: now(),
       updated_at: now(),
       completed_at: '',
+      is_expanded: true,
     }
     await db.tasks.put(task)
     await enqueue('task', 'create', task.id, task as unknown as Record<string, unknown>)
@@ -56,6 +58,16 @@ export const useTasksStore = create<TasksState>((set, get) => ({
     const existing = get().tasks.find(t => t.id === id)
     if (!existing) return
     const updated: Task = { ...existing, ...changes, updated_at: now() }
+    await db.tasks.put(updated)
+    await enqueue('task', 'update', id, updated as unknown as Record<string, unknown>)
+    set((s) => ({ tasks: s.tasks.map(t => t.id === id ? updated : t) }))
+    void import('@/services/syncService').then(({ scheduleFlush }) => { scheduleFlush() })
+  },
+
+  setTaskExpanded: async (id, is_expanded) => {
+    const existing = get().tasks.find(t => t.id === id)
+    if (!existing) return
+    const updated: Task = { ...existing, is_expanded }
     await db.tasks.put(updated)
     await enqueue('task', 'update', id, updated as unknown as Record<string, unknown>)
     set((s) => ({ tasks: s.tasks.map(t => t.id === id ? updated : t) }))

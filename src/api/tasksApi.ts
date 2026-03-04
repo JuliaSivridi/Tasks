@@ -6,7 +6,7 @@ import type { SheetsGetResponse } from '@/types/sheets'
 
 const HEADER = ['id','parent_id','folder_id','title','status','priority',
   'deadline_date','deadline_time','is_recurring','recur_type','recur_value',
-  'labels','sort_order','created_at','updated_at','completed_at']
+  'labels','sort_order','created_at','updated_at','completed_at','is_expanded']
 
 export async function fetchAllTasks(): Promise<Task[]> {
   const data = await sheetsRequest<SheetsGetResponse>('GET', `values/${TASK_RANGE}`)
@@ -27,8 +27,8 @@ export async function updateTask(task: Task): Promise<void> {
     await appendTask(task)
     return
   }
-  // Range A:P covers all 16 columns including completed_at (column P)
-  const range = `${SHEET_TASKS}!A${rowNum}:P${rowNum}`
+  // Range A:Q covers all 17 columns including is_expanded (column Q)
+  const range = `${SHEET_TASKS}!A${rowNum}:Q${rowNum}`
   await sheetsRequest('PUT', `values/${range}?valueInputOption=RAW`, {
     range,
     majorDimension: 'ROWS',
@@ -37,21 +37,28 @@ export async function updateTask(task: Task): Promise<void> {
 }
 
 export async function ensureHeader(): Promise<void> {
-  const data = await sheetsRequest<SheetsGetResponse>('GET', `values/${SHEET_TASKS}!A1:P1`)
+  const data = await sheetsRequest<SheetsGetResponse>('GET', `values/${SHEET_TASKS}!A1:Q1`)
   const row = data.values?.[0] ?? []
   if (row.length === 0) {
-    // Fresh sheet: write full 16-column header
-    await sheetsRequest('PUT', `values/${SHEET_TASKS}!A1:P1?valueInputOption=RAW`, {
-      range: `${SHEET_TASKS}!A1:P1`,
+    // Fresh sheet: write full 17-column header
+    await sheetsRequest('PUT', `values/${SHEET_TASKS}!A1:Q1?valueInputOption=RAW`, {
+      range: `${SHEET_TASKS}!A1:Q1`,
       majorDimension: 'ROWS',
       values: [HEADER],
     })
   } else if (row.length < 16) {
-    // Existing sheet missing completed_at column: add header to P1 only
-    await sheetsRequest('PUT', `values/${SHEET_TASKS}!P1?valueInputOption=RAW`, {
-      range: `${SHEET_TASKS}!P1`,
+    // Existing sheet missing completed_at: add from P1
+    await sheetsRequest('PUT', `values/${SHEET_TASKS}!P1:Q1?valueInputOption=RAW`, {
+      range: `${SHEET_TASKS}!P1:Q1`,
       majorDimension: 'ROWS',
-      values: [['completed_at']],
+      values: [['completed_at', 'is_expanded']],
+    })
+  } else if (row.length < 17) {
+    // Existing sheet missing is_expanded column: add Q1
+    await sheetsRequest('PUT', `values/${SHEET_TASKS}!Q1?valueInputOption=RAW`, {
+      range: `${SHEET_TASKS}!Q1`,
+      majorDimension: 'ROWS',
+      values: [['is_expanded']],
     })
   }
 }

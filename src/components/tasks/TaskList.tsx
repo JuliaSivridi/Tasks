@@ -11,7 +11,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { GripVertical } from 'lucide-react'
-import { format, startOfWeek, addDays } from 'date-fns'
+import { format, startOfWeek, addDays, parseISO } from 'date-fns'
 import { TaskItem } from './TaskItem'
 import { TaskCreateModal } from './TaskCreateModal'
 import { useUpcomingGroups, useFilteredRootTasks, useCompletedTasks, useAllTasks, useLabelTasks } from '@/hooks/useTasks'
@@ -41,11 +41,11 @@ function SortableTaskRow({ task, showFolder }: { task: Task; showFolder: boolean
       }}
       className="flex items-stretch"
     >
-      {/* Drag handle — desktop only */}
+      {/* Drag handle */}
       <button
         {...attributes}
         {...listeners}
-        className="hidden md:flex items-center px-1 text-muted-foreground/30 hover:text-muted-foreground cursor-grab active:cursor-grabbing touch-none"
+        className="flex items-center px-0.5 text-muted-foreground/50 hover:text-muted-foreground cursor-grab active:cursor-grabbing touch-none"
         tabIndex={-1}
       >
         <GripVertical size={14} />
@@ -189,7 +189,7 @@ function WeekStrip({
       </div>
 
       <button
-        onClick={() => setWeekOffset(0)}
+        onClick={() => onDayClick(todayStr)}
         className={cn(
           'text-[11px] px-1.5 py-0.5 rounded border flex-shrink-0 transition-colors',
           weekOffset === 0 ? 'border-primary text-primary' : 'border-border text-muted-foreground hover:bg-accent',
@@ -234,6 +234,15 @@ function UpcomingView() {
   const datesWithTasks = useMemo(() => {
     return new Set(groups.filter(g => !g.isOverdue).map(g => g.key))
   }, [groups])
+
+  // Auto-advance week strip when scroll moves activeDate to a different week
+  useEffect(() => {
+    if (!activeDate) return
+    const activeWeekStart = startOfWeek(parseISO(activeDate), { weekStartsOn: 1 })
+    const todayWeekStart = startOfWeek(new Date(), { weekStartsOn: 1 })
+    const diffDays = Math.round((activeWeekStart.getTime() - todayWeekStart.getTime()) / 86400000)
+    setWeekOffset(Math.round(diffDays / 7))
+  }, [activeDate])
 
   // Scroll to a date group
   const scrollToDate = useCallback((dateStr: string) => {
