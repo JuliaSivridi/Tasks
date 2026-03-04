@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef, type Dispatch, type SetStateAction } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Plus, FolderOpen, Trash2, RotateCcw, Flag, Tag, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -45,7 +45,7 @@ function SortableTaskRow({ task, showFolder }: { task: Task; showFolder: boolean
       <button
         {...attributes}
         {...listeners}
-        className="flex items-center px-0.5 text-muted-foreground/50 hover:text-muted-foreground cursor-grab active:cursor-grabbing touch-none"
+        className="flex items-center px-0.5 text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing touch-none"
         tabIndex={-1}
       >
         <GripVertical size={14} />
@@ -122,16 +122,18 @@ function UpcomingFilters({
 
 function WeekStrip({
   weekOffset,
-  setWeekOffset,
   activeDate,
   datesWithTasks,
   onDayClick,
+  onPrev,
+  onNext,
 }: {
   weekOffset: number
-  setWeekOffset: Dispatch<SetStateAction<number>>
   activeDate: string | null
   datesWithTasks: Set<string>
   onDayClick: (dateStr: string) => void
+  onPrev: () => void
+  onNext: () => void
 }) {
   const todayStr = format(new Date(), 'yyyy-MM-dd')
 
@@ -144,7 +146,7 @@ function WeekStrip({
   return (
     <div className="flex items-center gap-1 px-2 py-1.5 border-b bg-background">
       <button
-        onClick={() => setWeekOffset(o => o - 1)}
+        onClick={onPrev}
         className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
       >
         <ChevronLeft size={14} />
@@ -199,7 +201,7 @@ function WeekStrip({
       </button>
 
       <button
-        onClick={() => setWeekOffset(o => o + 1)}
+        onClick={onNext}
         className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
       >
         <ChevronRight size={14} />
@@ -244,14 +246,22 @@ function UpcomingView() {
     setWeekOffset(Math.round(diffDays / 7))
   }, [activeDate])
 
-  // Scroll to a date group
+  // Scroll to the group element for a given date key
   const scrollToDate = useCallback((dateStr: string) => {
     if (!scrollRef.current) return
     const el = scrollRef.current.querySelector<HTMLElement>(`[data-date="${dateStr}"]`)
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }
+    el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [])
+
+  // Find the first visible (filtered) group in a given week offset and scroll to it
+  const scrollToWeek = useCallback((offset: number) => {
+    const weekStart = addDays(startOfWeek(new Date(), { weekStartsOn: 1 }), offset * 7)
+    const weekEnd = addDays(weekStart, 6)
+    const startStr = format(weekStart, 'yyyy-MM-dd')
+    const endStr = format(weekEnd, 'yyyy-MM-dd')
+    const group = filtered.find(g => !g.isOverdue && g.key >= startStr && g.key <= endStr)
+    if (group) scrollToDate(group.key)
+  }, [filtered, scrollToDate])
 
   const handleDayClick = useCallback((dateStr: string) => {
     scrollToDate(dateStr)
@@ -261,9 +271,26 @@ function UpcomingView() {
   const handleTodayClick = useCallback(() => {
     setWeekOffset(0)
     const todayStr = format(new Date(), 'yyyy-MM-dd')
-    scrollToDate(todayStr)
+    // Scroll to today if it has tasks, otherwise to the nearest upcoming group
+    const todayGroup = filtered.find(g => !g.isOverdue && g.key === todayStr)
+    const nearestGroup = filtered.find(g => !g.isOverdue && g.key >= todayStr)
+      ?? filtered.find(g => !g.isOverdue)
+    const target = todayGroup ?? nearestGroup
+    if (target) scrollToDate(target.key)
     setActiveDate(todayStr)
-  }, [scrollToDate])
+  }, [filtered, scrollToDate])
+
+  const handlePrev = useCallback(() => {
+    const newOffset = weekOffset - 1
+    setWeekOffset(newOffset)
+    scrollToWeek(newOffset)
+  }, [weekOffset, scrollToWeek])
+
+  const handleNext = useCallback(() => {
+    const newOffset = weekOffset + 1
+    setWeekOffset(newOffset)
+    scrollToWeek(newOffset)
+  }, [weekOffset, scrollToWeek])
 
   // IntersectionObserver to track which date group is at the top
   useEffect(() => {
@@ -292,7 +319,6 @@ function UpcomingView() {
     <div className="flex flex-col h-full">
       <WeekStrip
         weekOffset={weekOffset}
-        setWeekOffset={setWeekOffset}
         activeDate={activeDate}
         datesWithTasks={datesWithTasks}
         onDayClick={(d) => {
@@ -302,6 +328,8 @@ function UpcomingView() {
             handleDayClick(d)
           }
         }}
+        onPrev={handlePrev}
+        onNext={handleNext}
       />
       <UpcomingFilters
         priorityFilter={priorityFilter}
