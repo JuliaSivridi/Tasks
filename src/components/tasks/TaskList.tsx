@@ -147,7 +147,7 @@ function WeekStrip({
     <div className="flex items-center gap-1 px-2 py-1.5 border-b bg-background">
       <button
         onClick={onPrev}
-        className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+        className="p-1 rounded hover:bg-accent text-foreground/60 hover:text-foreground transition-colors flex-shrink-0"
       >
         <ChevronLeft size={14} />
       </button>
@@ -169,20 +169,20 @@ function WeekStrip({
             >
               <span className={cn(
                 'text-xs font-medium leading-tight',
-                isToday ? 'text-emerald-500' : isActive ? 'text-foreground' : 'text-muted-foreground',
+                isToday ? 'text-emerald-500' : isActive ? 'text-foreground' : 'text-foreground/70',
               )}>
                 {format(day, 'd')}
               </span>
               <span className={cn(
                 'text-[10px] leading-tight',
-                isToday ? 'text-emerald-500' : 'text-muted-foreground/70',
+                isToday ? 'text-emerald-500' : isActive ? 'text-foreground/70' : 'text-foreground/50',
               )}>
                 {format(day, 'EEEEE')}
               </span>
               <span className={cn(
                 'w-1 h-1 rounded-full mt-0.5',
                 hasTasks
-                  ? isToday ? 'bg-emerald-500' : 'bg-muted-foreground/50'
+                  ? isToday ? 'bg-emerald-500' : 'bg-primary'
                   : 'bg-transparent',
               )} />
             </button>
@@ -202,7 +202,7 @@ function WeekStrip({
 
       <button
         onClick={onNext}
-        className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+        className="p-1 rounded hover:bg-accent text-foreground/60 hover:text-foreground transition-colors flex-shrink-0"
       >
         <ChevronRight size={14} />
       </button>

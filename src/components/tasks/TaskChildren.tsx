@@ -26,7 +26,7 @@ function SortableChildRow({ task, depth, showFolder }: { task: Task; depth: numb
       <button
         {...attributes}
         {...listeners}
-        className="flex items-center px-1 text-muted-foreground/30 hover:text-muted-foreground cursor-grab active:cursor-grabbing touch-none"
+        className="flex items-center px-0.5 text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing touch-none"
         tabIndex={-1}
       >
         <GripVertical size={14} />
