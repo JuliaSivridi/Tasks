@@ -77,6 +77,9 @@ export const useTasksStore = create<TasksState>((set, get) => ({
   completeTask: async (id) => {
     const { updateTask } = get()
     await updateTask(id, { status: 'completed', completed_at: now() })
+    // Flush immediately — don't rely on the 800 ms debounce so the change
+    // reaches Sheets before the user closes the app or switches device.
+    void import('@/services/syncService').then(({ flush }) => { void flush() })
   },
 
   deleteTask: async (id) => {

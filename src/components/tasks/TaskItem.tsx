@@ -158,7 +158,13 @@ export function TaskItem({ task, depth, showFolder = false, hideChildren = false
   const handleComplete = async () => {
     if (task.is_recurring && task.deadline_date) {
       const nextDate = getNextDueDate(task)
-      if (nextDate) await updateTask(task.id, { deadline_date: nextDate })
+      if (nextDate) {
+        await updateTask(task.id, { deadline_date: nextDate })
+        // Flush immediately so the new date reaches Sheets before the user
+        // closes the app — recurring tasks only advance the date, never complete,
+        // so they bypass completeTask's own immediate flush.
+        void import('@/services/syncService').then(({ flush }) => { void flush() })
+      }
     } else {
       await completeTask(task.id)
     }
