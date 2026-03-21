@@ -86,7 +86,7 @@ export const useAuthStore = create<AuthState>()(
         if (token && window.google?.accounts?.oauth2) {
           window.google.accounts.oauth2.revoke(token, () => {})
         }
-        set({ user: null, accessToken: null, tokenExpiry: null, isAuthenticated: false })
+        set({ user: null, accessToken: null, tokenExpiry: null, isAuthenticated: false, spreadsheetId: '' })
       },
     }),
     {

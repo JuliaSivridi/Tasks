@@ -43,6 +43,27 @@ export async function sheetsRequest<T>(
   })
 
   if (!res.ok) {
+    // On 401 (token expired or revoked server-side) attempt one silent refresh and retry
+    if (res.status === 401) {
+      try {
+        await useAuthStore.getState().refreshToken()
+      } catch {
+        throw new Error('Session expired. Please sign in again.')
+      }
+      const freshToken = useAuthStore.getState().accessToken
+      if (!freshToken) throw new Error('Session expired. Please sign in again.')
+      const retry = await fetch(url, {
+        method,
+        headers: {
+          Authorization: `Bearer ${freshToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: body ? JSON.stringify(body) : undefined,
+      })
+      if (retry.ok) return retry.json() as Promise<T>
+      const retryErr = await retry.json().catch(() => ({}))
+      throw new Error(`Sheets API ${retry.status}: ${JSON.stringify(retryErr)}`)
+    }
     const err = await res.json().catch(() => ({}))
     throw new Error(`Sheets API ${res.status}: ${JSON.stringify(err)}`)
   }

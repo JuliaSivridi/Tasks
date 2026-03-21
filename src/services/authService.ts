@@ -32,9 +32,12 @@ export async function initAuth(): Promise<void> {
   await loadGISScript()
 
   // Token client — callback fires after every requestAccessToken()
+  // login_hint lets GIS pick the right account silently on future loads
+  const loginHint = useAuthStore.getState().user?.email
   const tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
     scope: SCOPES,
+    login_hint: loginHint ?? undefined,
     callback: (resp) => {
       if (resp.error) {
         console.error('Token error:', resp.error)
