@@ -38,15 +38,14 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        // Mobile: anchored to bottom of visual viewport, slides up — always above keyboard
-        // Desktop (sm+): centered as usual
         "fixed z-50 grid w-full gap-4 border bg-background shadow-lg duration-200",
         "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-        // Mobile slide from bottom
-        "bottom-0 left-0 max-h-[92dvh] overflow-y-auto rounded-t-xl p-5",
-        "data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
-        // Desktop: center
-        "sm:bottom-auto sm:left-[50%] sm:top-[50%] sm:max-w-lg sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-lg sm:p-6",
+        // Mobile: pinned to top, full width, scrollable — keyboard pushes up from below,
+        // dialog stays visible at the top (same behaviour as Todoist)
+        "inset-x-0 top-0 max-h-dvh overflow-y-auto rounded-b-xl p-5",
+        "data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top",
+        // Desktop sm+: centered
+        "sm:inset-x-auto sm:top-[50%] sm:left-[50%] sm:max-w-lg sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-lg sm:p-6",
         "sm:data-[state=closed]:zoom-out-95 sm:data-[state=open]:zoom-in-95",
         "sm:data-[state=closed]:slide-out-to-left-1/2 sm:data-[state=closed]:slide-out-to-top-[48%]",
         "sm:data-[state=open]:slide-in-from-left-1/2 sm:data-[state=open]:slide-in-from-top-[48%]",

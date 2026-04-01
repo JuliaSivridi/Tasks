@@ -77,43 +77,40 @@ function UpcomingFilters({
   const { labels } = useLabelsStore()
 
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 border-b overflow-x-auto scrollbar-none">
+    <div className="flex items-center gap-1.5 px-3 py-1.5 border-b flex-wrap">
       {/* Priority pills */}
-      <div className="flex items-center gap-1 flex-shrink-0">
-        {PRIORITY_OPTS.map(p => (
-          <button
-            key={p.id}
-            onClick={() => setPriorityFilter(priorityFilter === p.id ? null : p.id)}
-            className={cn(
-              'p-1.5 rounded transition-colors hover:bg-accent',
-              priorityFilter === p.id && 'bg-accent',
-            )}
-            title={p.title}
-          >
-            <Flag size={14} style={{ color: p.color }} />
-          </button>
-        ))}
-      </div>
+      {PRIORITY_OPTS.map(p => (
+        <button
+          key={p.id}
+          onClick={() => setPriorityFilter(priorityFilter === p.id ? null : p.id)}
+          className={cn(
+            'p-1.5 rounded transition-colors hover:bg-accent',
+            priorityFilter === p.id && 'bg-accent',
+          )}
+          title={p.title}
+        >
+          <Flag size={14} style={{ color: p.color }} />
+        </button>
+      ))}
+
+      {/* Divider */}
+      {labels.length > 0 && <span className="w-px h-4 bg-border flex-shrink-0" />}
 
       {/* Label pills */}
-      {labels.length > 0 && (
-        <div className="flex items-center gap-1 flex-nowrap">
-          {labels.map(l => (
-            <button
-              key={l.id}
-              onClick={() => setLabelFilter(labelFilter === l.id ? null : l.id)}
-              className={cn(
-                'flex items-center gap-1 px-2 py-1 rounded-full border text-xs transition-colors hover:bg-accent',
-                labelFilter === l.id ? 'bg-accent' : 'border-border',
-              )}
-              style={labelFilter === l.id ? { borderColor: l.color } : {}}
-            >
-              <Tag size={10} style={{ color: l.color }} />
-              <span style={{ color: l.color }}>{l.name}</span>
-            </button>
-          ))}
-        </div>
-      )}
+      {labels.map(l => (
+        <button
+          key={l.id}
+          onClick={() => setLabelFilter(labelFilter === l.id ? null : l.id)}
+          className={cn(
+            'flex items-center gap-1 px-2 py-1 rounded-full border text-xs transition-colors hover:bg-accent',
+            labelFilter === l.id ? 'bg-accent' : 'border-border',
+          )}
+          style={labelFilter === l.id ? { borderColor: l.color } : {}}
+        >
+          <Tag size={10} style={{ color: l.color }} />
+          <span style={{ color: l.color }}>{l.name}</span>
+        </button>
+      ))}
     </div>
   )
 }
