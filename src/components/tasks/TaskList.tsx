@@ -169,20 +169,20 @@ function WeekStrip({
             >
               <span className={cn(
                 'text-xs font-medium leading-tight',
-                isToday ? 'text-emerald-500' : isActive ? 'text-foreground' : 'text-foreground/70',
+                isToday ? 'text-green-600' : isActive ? 'text-foreground' : 'text-foreground/70',
               )}>
                 {format(day, 'd')}
               </span>
               <span className={cn(
                 'text-[10px] leading-tight',
-                isToday ? 'text-emerald-500' : isActive ? 'text-foreground/70' : 'text-foreground/50',
+                isToday ? 'text-green-600' : isActive ? 'text-foreground/70' : 'text-foreground/50',
               )}>
                 {format(day, 'EEEEE')}
               </span>
               <span className={cn(
                 'w-1 h-1 rounded-full mt-0.5',
                 hasTasks
-                  ? isToday ? 'bg-emerald-500' : 'bg-primary'
+                  ? isToday ? 'bg-green-600' : 'bg-primary'
                   : 'bg-transparent',
               )} />
             </button>
@@ -350,9 +350,9 @@ function UpcomingView() {
           {filtered.map(group => (
             <div key={group.key} data-date={group.isOverdue ? undefined : group.key}>
               <div className={cn(
-                'px-2 py-1 text-sm font-semibold mb-1',
+                'px-2 py-1 text-sm font-bold mb-1',
                 group.isOverdue ? 'text-red-400'
-                  : group.isToday ? 'text-emerald-500'
+                  : group.isToday ? 'text-green-600'
                   : group.label === 'Tomorrow' ? 'text-orange-400'
                   : 'text-muted-foreground',
               )}>

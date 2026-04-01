@@ -148,7 +148,7 @@ export function TaskItem({ task, depth, showFolder = false, hideChildren = false
 
   const deadlineStatus = task.deadline_date ? getDeadlineStatus(task.deadline_date, task.deadline_time) : null
   const timeColorClass = deadlineStatus === 'overdue' ? 'text-red-400'
-    : deadlineStatus === 'today' ? 'text-emerald-500'
+    : deadlineStatus === 'today' ? 'text-green-600'
     : deadlineStatus === 'tomorrow' ? 'text-orange-400'
     : deadlineStatus === 'week' ? 'text-violet-400'
     : 'text-muted-foreground'
