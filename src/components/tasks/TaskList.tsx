@@ -174,7 +174,7 @@ function WeekStrip({
                 {format(day, 'd')}
               </span>
               <span className={cn(
-                'text-[10px] leading-tight',
+                'text-xs leading-tight',
                 isToday ? 'text-green-600' : isActive ? 'text-foreground/70' : 'text-foreground/50',
               )}>
                 {format(day, 'EEEEE')}
@@ -193,7 +193,7 @@ function WeekStrip({
       <button
         onClick={() => onDayClick(todayStr)}
         className={cn(
-          'text-[11px] px-1.5 py-0.5 rounded border flex-shrink-0 transition-colors',
+          'text-xs px-1.5 py-0.5 rounded border flex-shrink-0 transition-colors',
           weekOffset === 0 ? 'border-primary text-primary' : 'border-border text-muted-foreground hover:bg-accent',
         )}
       >
