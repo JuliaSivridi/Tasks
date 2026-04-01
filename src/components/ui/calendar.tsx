@@ -5,6 +5,11 @@ import {
   ChevronRightIcon,
 } from "lucide-react"
 import { DayButton, DayPicker, getDefaultClassNames } from "react-day-picker"
+import { enUS } from "date-fns/locale"
+
+// Force Monday as first day regardless of browser locale (Intl.Locale.weekInfo
+// on mobile Chrome can override the weekStartsOn prop via locale.options)
+const localeMonday = { ...enUS, options: { ...enUS.options, weekStartsOn: 1 as const } }
 
 import { cn } from "@/lib/utils"
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -166,6 +171,7 @@ function Calendar({
         ...components,
       }}
       {...props}
+      locale={localeMonday}
       weekStartsOn={1}
     />
   )
