@@ -77,9 +77,9 @@ function UpcomingFilters({
   const { labels } = useLabelsStore()
 
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 border-b flex-wrap">
+    <div className="flex items-center gap-2 px-3 py-1.5 border-b overflow-x-auto scrollbar-none">
       {/* Priority pills */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 flex-shrink-0">
         {PRIORITY_OPTS.map(p => (
           <button
             key={p.id}
@@ -97,7 +97,7 @@ function UpcomingFilters({
 
       {/* Label pills */}
       {labels.length > 0 && (
-        <div className="flex items-center gap-1 flex-wrap">
+        <div className="flex items-center gap-1 flex-nowrap">
           {labels.map(l => (
             <button
               key={l.id}

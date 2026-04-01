@@ -16,6 +16,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { useTasksStore } from '@/store/tasksStore'
 import { useUIStore } from '@/store/uiStore'
 import { useLabelsStore } from '@/store/labelsStore'
+import { useFoldersStore } from '@/store/foldersStore'
 import { INBOX_FOLDER_ID, LABEL_COLOR_PRESETS } from '@/utils/constants'
 import { cn } from '@/lib/utils'
 import type { Task } from '@/types/task'
@@ -51,6 +52,7 @@ export function TaskCreateModal({ open, editing, parentId = '', onClose }: Props
   const { addTask, updateTask } = useTasksStore()
   const { selectedFolderId, selectedView } = useUIStore()
   const { labels, addLabel } = useLabelsStore()
+  const { folders } = useFoldersStore()
 
   const [creatingLabel, setCreatingLabel] = useState(false)
   const [newLabelName, setNewLabelName] = useState('')
@@ -102,6 +104,34 @@ export function TaskCreateModal({ open, editing, parentId = '', onClose }: Props
     return INBOX_FOLDER_ID
   }
 
+  // Parse @FolderName and #LabelName tokens from the title.
+  // Returns cleaned title, resolved folder id (or null), and extra label ids.
+  const parseTitle = (raw: string, baseLabelIds: string[], baseFolderId: string) => {
+    let title = raw
+
+    // @FolderName — find folder by name (case-insensitive), strip token
+    let folderId = baseFolderId
+    title = title.replace(/@(\S+)/g, (match, name: string) => {
+      const found = folders.find(f => f.name.toLowerCase() === name.toLowerCase())
+      if (found) { folderId = found.id; return '' }
+      return match  // no match — keep as-is
+    })
+
+    // #LabelName — find label by name (case-insensitive), strip token
+    const extraLabels = new Set(baseLabelIds)
+    title = title.replace(/#(\S+)/g, (match, name: string) => {
+      const found = labels.find(l => l.name.toLowerCase() === name.toLowerCase())
+      if (found) { extraLabels.add(found.id); return '' }
+      return match  // no match — keep as-is
+    })
+
+    return {
+      title: title.replace(/\s{2,}/g, ' ').trim(),
+      folderId,
+      labelsStr: Array.from(extraLabels).join(','),
+    }
+  }
+
   const handleCreateLabel = async () => {
     if (!newLabelName.trim()) return
     const created = await addLabel({ name: newLabelName.trim(), color: newLabelColor })
@@ -119,12 +149,19 @@ export function TaskCreateModal({ open, editing, parentId = '', onClose }: Props
   }
 
   const onSubmit = async (data: FormValues) => {
+    const baseFolderId = resolveFolderId()
+    const { title, folderId, labelsStr } = parseTitle(
+      data.title,
+      data.labels.split(',').filter(Boolean),
+      baseFolderId,
+    )
     if (editing) {
       await updateTask(editing.id, {
-        title: data.title,
+        title,
         priority: data.priority,
         parent_id: data.parent_id,
-        labels: data.labels,
+        labels: labelsStr,
+        folder_id: folderId,
         deadline_date: data.deadline_date,
         deadline_time: data.deadline_time,
         is_recurring: data.is_recurring,
@@ -133,11 +170,11 @@ export function TaskCreateModal({ open, editing, parentId = '', onClose }: Props
       })
     } else {
       await addTask({
-        title: data.title,
+        title,
         priority: data.priority,
-        folder_id: resolveFolderId(),
+        folder_id: folderId,
         parent_id: data.parent_id,
-        labels: data.labels,
+        labels: labelsStr,
         deadline_date: data.deadline_date,
         deadline_time: data.deadline_time,
         is_recurring: data.is_recurring,
